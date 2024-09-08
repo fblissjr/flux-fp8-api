@@ -1,6 +1,7 @@
 import argparse
 import uvicorn
 from api import app
+import loguru
 
 
 def parse_args():
@@ -145,6 +146,11 @@ def parse_args():
         dest="quantize_flow_embedder_layers",
         help="Quantize the flow embedder layers in the flow model, saves ~512MB vram usage, but precision loss is very noticeable",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode for more verbose output",
+    )
     # optional LoRA arguments
     parser.add_argument(
         "--lora",
@@ -164,13 +170,32 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # lazy loading so cli returns fast instead of waiting for torch to load modules
+    # Set up Loguru
+    logger = loguru.logger
+    logger.remove(0)  # Remove the default handler
+
+    if args.debug:
+        logger.add(
+            lambda msg: print(msg, end=""),
+            format="{time:YYYY-MM-DD HH:mm:ss!UTC} | {level}     | {message}",
+            level="DEBUG",
+        )
+    else:
+        logger.add(
+            lambda msg: print(msg, end=""),
+            format="{time:YYYY-MM-DD HH:mm:ss!UTC} | {level}     | {message}",
+            level="INFO",
+        )
+
+    # Lazy loading so cli returns fast instead of waiting for torch to load modules
     from flux_pipeline import FluxPipeline
     from util import load_config, ModelVersion
 
     if args.config_path:
         pipeline = FluxPipeline.load_pipeline_from_config_path(
-            args.config_path, flow_model_path=args.flow_model_path
+            args.config_path,
+            flow_model_path=args.flow_model_path,
+            debug=args.debug,
         )
     else:
         model_version = (
@@ -203,7 +228,7 @@ def main():
             quantize_modulation=args.quantize_modulation,
             quantize_flow_embedder_layers=args.quantize_flow_embedder_layers,
         )
-        pipeline = FluxPipeline.load_pipeline_from_config(config)
+        pipeline = FluxPipeline.load_pipeline_from_config(config, debug=args.debug)
 
     # Load LoRA if specified
     if args.lora:

@@ -32,7 +32,7 @@ from loguru import logger
 from torchvision.transforms import functional as TF
 from tqdm import tqdm
 
-import lora_loading
+from lora_loading import apply_lora_to_model
 from image_encoder import ImageEncoder
 from util import (
     ModelSpec,
@@ -109,6 +109,11 @@ class FluxPipeline:
         self.offload_text_encoder = config.offload_text_encoder
         self.offload_vae = config.offload_vae
         self.offload_flow = config.offload_flow
+
+        # Set the logging level based on the debug flag
+        logger.remove()
+        logger.add(level="DEBUG" if self.debug else "INFO")
+
         # If models are not offloaded, move them to the appropriate devices
 
         if not self.offload_flow:
@@ -160,7 +165,7 @@ class FluxPipeline:
             scale (float): Scaling factor for the LoRA weights.
 
         """
-        self.model = lora_loading.apply_lora_to_model(self.model, lora_path, scale)
+        self.model = apply_lora_to_model(self.model, lora_path, scale, debug=self.debug)
 
     @torch.inference_mode()
     def compile(self):

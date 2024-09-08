@@ -8,6 +8,8 @@ from einops import repeat
 if TYPE_CHECKING:
     from flux_pipeline import FluxPipeline
 
+from loguru import logger
+
 
 def parse_prompt_attention(text):
     """
@@ -144,6 +146,11 @@ def get_prompts_tokens_with_weights(
             ,prompt = "a (red:1.5) cat"*70
         )
     """
+    if debug:
+        logger.info(
+            "Tokenizing prompt for {} model: {}", type(clip_tokenizer).__name__, prompt
+        )
+
     texts_and_weights = parse_prompt_attention(prompt)
     text_tokens, text_weights = [], []
     maxlen = clip_tokenizer.model_max_length
@@ -154,14 +161,23 @@ def get_prompts_tokens_with_weights(
         ).input_ids
         # so that tokenize whatever length prompt
         # the returned token is a 1d list: [320, 1125, 539, 320]
+
+        # debug info
         if debug:
-            print(
-                token,
-                "|FOR MODEL LEN{}|".format(maxlen),
-                clip_tokenizer.decode(
-                    token, skip_special_tokens=True, clean_up_tokenization_spaces=True
-                ),
+            logger.info(
+                "Token: {} |FOR {} MODEL LEN{}| {} Weight: {}".format(
+                    token,
+                    type(clip_tokenizer).__name__,
+                    maxlen,
+                    clip_tokenizer.decode(
+                        token,
+                        skip_special_tokens=True,
+                        clean_up_tokenization_spaces=True,
+                    ),
+                    weight,
+                )
             )
+
         # merge the new tokens to the all tokens holder: text_tokens
         text_tokens = [*text_tokens, *token]
 
@@ -171,6 +187,19 @@ def get_prompts_tokens_with_weights(
 
         # append the weight back to the weight holder: text_weights
         text_weights = [*text_weights, *chunk_weights]
+
+    if debug:
+        logger.info(
+            "Tokenization complete for {} model. Token IDs: {}",
+            type(clip_tokenizer).__name__,
+            text_tokens,
+        )
+        logger.info(
+            "Token weights for {} model: {}",
+            type(clip_tokenizer).__name__,
+            text_weights,
+        )
+
     return text_tokens, text_weights
 
 
@@ -313,10 +342,10 @@ def get_weighted_text_embeddings_flux(
 ):
     """
     This function can process long prompt with weights, no length limitation
-    for Stable Diffusion XL
+    for Flux pipeline
 
     Args:
-        pipe (StableDiffusionPipeline)
+        pipe (FluxPipeline)
         prompt (str)
         prompt_2 (str)
         neg_prompt (str)
@@ -327,6 +356,9 @@ def get_weighted_text_embeddings_flux(
         prompt_embeds (torch.Tensor)
         neg_prompt_embeds (torch.Tensor)
     """
+    if debug:
+        logger.info("Computing weighted text embeddings for prompt: {}", prompt)
+
     device = device or pipe._execution_device
 
     eos = pipe.clip.tokenizer.eos_token_id
@@ -344,14 +376,28 @@ def get_weighted_text_embeddings_flux(
     clip_length = 77
 
     # tokenizer 1
+    if debug:
+        logger.info("Tokenizing prompt for CLIP model with uniform weights...")
     prompt_tokens_clip, prompt_weights_clip = get_prompts_tokens_with_weights(
         tokenizer_clip, prompt, debug=debug
     )
+    if debug:
+        logger.info(
+            "Tokenization complete for CLIP model. Token IDs: {}", prompt_tokens_clip
+        )
+        logger.info("Token weights for CLIP model (uniform): {}", prompt_weights_clip)
 
     # tokenizer 2
+    if debug:
+        logger.info("Tokenizing prompt for T5 model with uniform weights...")
     prompt_tokens_t5, prompt_weights_t5 = get_prompts_tokens_with_weights(
         tokenizer_t5, prompt, debug=debug
     )
+    if debug:
+        logger.info(
+            "Tokenization complete for T5 model. Token IDs: {}", prompt_tokens_t5
+        )
+        logger.info("Token weights for T5 model (uniform): {}", prompt_weights_t5)
 
     prompt_tokens_clip_grouped, prompt_weights_clip_grouped = group_tokens_and_weights(
         prompt_tokens_clip,
@@ -424,7 +470,9 @@ def get_weighted_text_embeddings_flux(
     ]
     t5_embeds = apply_weights(prompt_tokens_t5, weight_tensor_t5, t5_embeds, eos_2)
     if debug:
-        print(t5_embeds.shape)
+        logger.info("T5 embeddings shape: {}", t5_embeds.shape)
+        logger.info("T5 embeddings dtype: {}", t5_embeds.dtype)
+        logger.info("T5 embeddings device: {}", t5_embeds.device)
     if t5_embeds.shape[0] == 1 and num_images_per_prompt > 1:
         t5_embeds = repeat(t5_embeds, "1 ... -> bs ...", bs=num_images_per_prompt)
     txt_ids = torch.zeros(
@@ -436,6 +484,9 @@ def get_weighted_text_embeddings_flux(
     )
     t5_embeds = t5_embeds.to(target_device, dtype=target_dtype)
     clip_embeds = clip_embeds.to(target_device, dtype=target_dtype)
+
+    if debug:
+        logger.debug("Weighted text embeddings computation complete.")
 
     return (
         clip_embeds,
