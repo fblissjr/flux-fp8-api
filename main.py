@@ -145,6 +145,19 @@ def parse_args():
         dest="quantize_flow_embedder_layers",
         help="Quantize the flow embedder layers in the flow model, saves ~512MB vram usage, but precision loss is very noticeable",
     )
+    # optional LoRA arguments
+    parser.add_argument(
+        "--lora",
+        type=str,
+        default=None,
+        help="Path to the LoRA weights file",
+    )
+    parser.add_argument(
+        "--lora-scale",
+        type=float,
+        default=1.0,
+        help="Scaling factor for the LoRA weights",
+    )
     return parser.parse_args()
 
 
@@ -156,7 +169,7 @@ def main():
     from util import load_config, ModelVersion
 
     if args.config_path:
-        app.state.model = FluxPipeline.load_pipeline_from_config_path(
+        pipeline = FluxPipeline.load_pipeline_from_config_path(
             args.config_path, flow_model_path=args.flow_model_path
         )
     else:
@@ -190,7 +203,13 @@ def main():
             quantize_modulation=args.quantize_modulation,
             quantize_flow_embedder_layers=args.quantize_flow_embedder_layers,
         )
-        app.state.model = FluxPipeline.load_pipeline_from_config(config)
+        pipeline = FluxPipeline.load_pipeline_from_config(config)
+
+    # Load LoRA if specified
+    if args.lora:
+        pipeline.load_lora(args.lora, scale=args.lora_scale)
+
+    app.state.model = pipeline
 
     uvicorn.run(app, host=args.host, port=args.port)
 

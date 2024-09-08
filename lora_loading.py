@@ -110,53 +110,78 @@ def convert_diffusers_to_flux_transformer_checkpoint(
             f"double_blocks.{i}.img_mod.lin.weight",
         )
 
-        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
-            original_state_dict,
-            diffusers_state_dict,
-            f"{prefix}{block_prefix}norm1_context.linear.weight",
-            f"double_blocks.{i}.txt_mod.lin.weight",
-        )
+        # Q, K, V
+        sample_q_A_key = f"{prefix}{block_prefix}attn.to_q.lora_A.weight"
+        sample_q_B_key = f"{prefix}{block_prefix}attn.to_q.lora_B.weight"
+        if (
+            sample_q_A_key in diffusers_state_dict
+            and sample_q_B_key in diffusers_state_dict
+        ):
+            sample_q_A = diffusers_state_dict.pop(sample_q_A_key)
+            sample_q_B = diffusers_state_dict.pop(sample_q_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
-        sample_q_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_q.lora_A.weight"
-        )
-        sample_q_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_q.lora_B.weight"
-        )
+        sample_k_A_key = f"{prefix}{block_prefix}attn.to_k.lora_A.weight"
+        sample_k_B_key = f"{prefix}{block_prefix}attn.to_k.lora_B.weight"
+        if (
+            sample_k_A_key in diffusers_state_dict
+            and sample_k_B_key in diffusers_state_dict
+        ):
+            sample_k_A = diffusers_state_dict.pop(sample_k_A_key)
+            sample_k_B = diffusers_state_dict.pop(sample_k_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
-        sample_k_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_k.lora_A.weight"
-        )
-        sample_k_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_k.lora_B.weight"
-        )
+        sample_v_A_key = f"{prefix}{block_prefix}attn.to_v.lora_A.weight"
+        sample_v_B_key = f"{prefix}{block_prefix}attn.to_v.lora_B.weight"
+        if (
+            sample_v_A_key in diffusers_state_dict
+            and sample_v_B_key in diffusers_state_dict
+        ):
+            sample_v_A = diffusers_state_dict.pop(sample_v_A_key)
+            sample_v_B = diffusers_state_dict.pop(sample_v_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
-        sample_v_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_v.lora_A.weight"
-        )
-        sample_v_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.to_v.lora_B.weight"
-        )
+        context_q_A_key = f"{prefix}{block_prefix}attn.add_q_proj.lora_A.weight"
+        context_q_B_key = f"{prefix}{block_prefix}attn.add_q_proj.lora_B.weight"
+        if (
+            context_q_A_key in diffusers_state_dict
+            and context_q_B_key in diffusers_state_dict
+        ):
+            context_q_A = diffusers_state_dict.pop(context_q_A_key)
+            context_q_B = diffusers_state_dict.pop(context_q_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
-        context_q_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_q_proj.lora_A.weight"
-        )
-        context_q_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_q_proj.lora_B.weight"
-        )
+        context_k_A_key = f"{prefix}{block_prefix}attn.add_k_proj.lora_A.weight"
+        context_k_B_key = f"{prefix}{block_prefix}attn.add_k_proj.lora_B.weight"
+        if (
+            context_k_A_key in diffusers_state_dict
+            and context_k_B_key in diffusers_state_dict
+        ):
+            context_k_A = diffusers_state_dict.pop(context_k_A_key)
+            context_k_B = diffusers_state_dict.pop(context_k_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
-        context_k_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_k_proj.lora_A.weight"
-        )
-        context_k_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_k_proj.lora_B.weight"
-        )
-        context_v_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_v_proj.lora_A.weight"
-        )
-        context_v_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}attn.add_v_proj.lora_B.weight"
-        )
+        context_v_A_key = f"{prefix}{block_prefix}attn.add_v_proj.lora_A.weight"
+        context_v_B_key = f"{prefix}{block_prefix}attn.add_v_proj.lora_B.weight"
+        if (
+            context_v_A_key in diffusers_state_dict
+            and context_v_B_key in diffusers_state_dict
+        ):
+            context_v_A = diffusers_state_dict.pop(context_v_A_key)
+            context_v_B = diffusers_state_dict.pop(context_v_B_key)
+        else:
+            logger.info(f"Skipping layer {i} since no LoRA weight is available")
+            continue
 
         original_state_dict[f"double_blocks.{i}.img_attn.qkv.lora_A.weight"] = (
             torch.cat([sample_q_A, sample_k_A, sample_v_A], dim=0)
@@ -243,41 +268,74 @@ def convert_diffusers_to_flux_transformer_checkpoint(
     # single transformer blocks
     for i in range(num_single_layers):
         block_prefix = f"single_transformer_blocks.{i}."
-        # norm.linear -> single_blocks.0.modulation.lin
-        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
-            original_state_dict,
-            diffusers_state_dict,
-            f"{prefix}{block_prefix}norm.linear.weight",
-            f"single_blocks.{i}.modulation.lin.weight",
-        )
-
-        # Q, K, V, mlp
-        q_A = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_q.lora_A.weight")
-        q_B = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_q.lora_B.weight")
-        k_A = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_k.lora_A.weight")
-        k_B = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_k.lora_B.weight")
-        v_A = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_v.lora_A.weight")
-        v_B = diffusers_state_dict.pop(f"{prefix}{block_prefix}attn.to_v.lora_B.weight")
-        mlp_A = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}proj_mlp.lora_A.weight"
-        )
-        mlp_B = diffusers_state_dict.pop(
-            f"{prefix}{block_prefix}proj_mlp.lora_B.weight"
-        )
-        original_state_dict[f"single_blocks.{i}.linear1.lora_A.weight"] = torch.cat(
-            [q_A, k_A, v_A, mlp_A], dim=0
-        )
-        original_state_dict[f"single_blocks.{i}.linear1.lora_B.weight"] = torch.cat(
-            [q_B, k_B, v_B, mlp_B], dim=0
-        )
-
-        # output projections
         original_state_dict, diffusers_state_dict = convert_if_lora_exists(
             original_state_dict,
             diffusers_state_dict,
             f"{prefix}{block_prefix}proj_out.weight",
             f"single_blocks.{i}.linear2.weight",
         )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}proj_out.bias",
+            f"single_blocks.{i}.linear2.bias",
+        )
+
+        # Q, K, V, mlp
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_q.lora_A.weight",
+            f"single_blocks.{i}.attn.to_q.weight",  # Removed lora_A suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_q.lora_B.weight",
+            f"single_blocks.{i}.attn.to_q.bias",  # Removed lora_B suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_k.lora_A.weight",
+            f"single_blocks.{i}.attn.to_k.weight",  # Removed lora_A suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_k.lora_B.weight",
+            f"single_blocks.{i}.attn.to_k.bias",  # Removed lora_B suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_v.lora_A.weight",
+            f"single_blocks.{i}.attn.to_v.weight",  # Removed lora_A suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}attn.to_v.lora_B.weight",
+            f"single_blocks.{i}.attn.to_v.bias",  # Removed lora_B suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}proj_mlp.lora_A.weight",
+            f"single_blocks.{i}.linear1.weight",  # Removed lora_A suffix
+        )
+        original_state_dict, diffusers_state_dict = convert_if_lora_exists(
+            original_state_dict,
+            diffusers_state_dict,
+            f"{prefix}{block_prefix}proj_mlp.lora_B.weight",
+            f"single_blocks.{i}.linear1.bias",  # Removed lora_B suffix
+        )
+
+        # output projections
+        # This section is not needed anymore, as we've already handled the output projections above
+
+    else:
+        logger.info("No LoRA weights found for single transformer blocks")
 
     original_state_dict, diffusers_state_dict = convert_if_lora_exists(
         original_state_dict,
@@ -299,6 +357,7 @@ def convert_diffusers_to_flux_transformer_checkpoint(
     )
     if len(list(diffusers_state_dict.keys())) > 0:
         logger.warning("Unexpected keys:", diffusers_state_dict.keys())
+        print(diffusers_state_dict.keys())
 
     return original_state_dict
 
@@ -339,9 +398,12 @@ def get_module_for_key(
 
 def get_lora_for_key(key: str, lora_weights: dict):
     prefix = key.split(".lora")[0]
-    lora_A = lora_weights[f"{prefix}.lora_A.weight"]
-    lora_B = lora_weights[f"{prefix}.lora_B.weight"]
-    alpha = lora_weights.get(f"{prefix}.alpha", None)
+    lora_A = lora_weights.get(f"{prefix}.lora_A.weight")
+    lora_B = lora_weights.get(f"{prefix}.lora_B.weight")
+    alpha = lora_weights.get(f"{prefix}.alpha")
+    # return None if the key is not found in the LoRA weights dict to indicate that the layer does not have a corresponding LoRA weight
+    if lora_A is None or lora_B is None:
+        return None
     return lora_A, lora_B, alpha
 
 
@@ -390,52 +452,75 @@ def apply_lora_to_model(model: Flux, lora_path: str, lora_scale: float = 1.0) ->
     has_guidance = model.params.guidance_embed
     logger.info(f"Loading LoRA weights for {lora_path}")
     lora_weights = load_file(lora_path)
+
+    logger.info("Original lora_weights:")
+    logger.info(lora_weights.keys())
+
     from_original_flux = False
     check_if_starts_with_transformer = [
         k for k in lora_weights.keys() if k.startswith("transformer.")
     ]
     if len(check_if_starts_with_transformer) > 0:
+        logger.info("Using prefix 'transformer.'")
+        # hardcoded 19 single layers and 23 double
+        logger.info("Converting lora_weights...")
         lora_weights = convert_diffusers_to_flux_transformer_checkpoint(
-            lora_weights, 19, 38, has_guidance=has_guidance, prefix="transformer."
+            lora_weights, 19, 23, has_guidance=has_guidance, prefix="transformer."
         )
+        logger.info("Converted lora_weights:")
+        logger.info(lora_weights.keys())
     else:
+        logger.info("Not using prefix 'transformer.'")
         from_original_flux = True
         lora_weights = convert_from_original_flux_checkpoint(lora_weights)
+        logger.info("Converted lora_weights:")
+        logger.info(lora_weights.keys())
+
     logger.info("LoRA weights loaded")
-    logger.debug("Extracting keys")
+    logger.info("Extracting keys")
     keys_without_ab = [
         key.replace(".lora_A.weight", "")
         .replace(".lora_B.weight", "")
         .replace(".alpha", "")
         for key in lora_weights.keys()
     ]
-    logger.debug("Keys extracted")
+    logger.info("Keys extracted")
     keys_without_ab = list(set(keys_without_ab))
 
     for key in tqdm(keys_without_ab, desc="Applying LoRA", total=len(keys_without_ab)):
-        module = get_module_for_key(key, model)
-        dtype = model.dtype
-        weight_is_f8 = False
-        if isinstance(module, F8Linear):
-            weight_is_f8 = True
-            weight_f16 = (
-                module.float8_data.clone()
-                .detach()
-                .float()
-                .mul(module.scale_reciprocal)
-                .to(module.weight.device)
+        logger.info(f"Processing key: {key}")
+        try:
+            module = get_module_for_key(key, model)
+            logger.info(f"Retrieved module for key: {key}")
+            dtype = model.dtype
+            weight_is_f8 = False
+            if isinstance(module, F8Linear):
+                weight_is_f8 = True
+                weight_f16 = (
+                    module.float8_data.clone()
+                    .detach()
+                    .float()
+                    .mul(module.scale_reciprocal)
+                    .to(module.weight.device)
+                )
+            elif isinstance(module, torch.nn.Linear):
+                weight_f16 = module.weight.clone().detach().float()
+            elif isinstance(module, CublasLinear):
+                weight_f16 = module.weight.clone().detach().float()
+            lora_sd = get_lora_for_key(key, lora_weights)
+            if lora_sd is None:
+                logger.info(f"Skipping layer {key} since no LoRA weight is available")
+                continue
+
+            weight_f16 = apply_lora_weight_to_module(
+                weight_f16, lora_sd, lora_scale=lora_scale
             )
-        elif isinstance(module, torch.nn.Linear):
-            weight_f16 = module.weight.clone().detach().float()
-        elif isinstance(module, CublasLinear):
-            weight_f16 = module.weight.clone().detach().float()
-        lora_sd = get_lora_for_key(key, lora_weights)
-        weight_f16 = apply_lora_weight_to_module(
-            weight_f16, lora_sd, lora_scale=lora_scale
-        )
-        if weight_is_f8:
-            module.set_weight_tensor(weight_f16.type(dtype))
-        else:
-            module.weight.data = weight_f16.type(dtype)
+            logger.info(f"Updated weight for key: {key}")
+            if weight_is_f8:
+                module.set_weight_tensor(weight_f16.type(dtype))
+            else:
+                module.weight.data = weight_f16.type(dtype)
+        except Exception as e:
+            logger.error(f"Error applying LoRA weight for key: {key} - {str(e)}")
     logger.success("Lora applied")
     return model
