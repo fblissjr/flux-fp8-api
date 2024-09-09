@@ -514,6 +514,111 @@ class FluxPipeline:
         return x, timesteps
 
     @torch.inference_mode()
+    def get_text_embeddings(
+        self, prompt: str
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Generate text embeddings for a given prompt.
+
+        Args:
+            prompt (str): The input text prompt.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A tuple containing (clip_embeds, t5_embeds, txt_ids)
+
+        Raises:
+            RuntimeError: If there's an issue generating embeddings.
+        """
+        try:
+            logger.info(f"Generating text embeddings for prompt: {prompt}")
+            clip_embeds, t5_embeds, txt_ids = get_weighted_text_embeddings_flux(
+                self,
+                prompt,
+                num_images_per_prompt=1,
+                device=self.device_clip,
+                target_device=self.device_flux,
+                target_dtype=self.dtype,
+            )
+            return clip_embeds, t5_embeds, txt_ids
+        except Exception as e:
+            logger.error(f"Error in get_text_embeddings: {str(e)}")
+            raise RuntimeError("Failed to generate text embeddings") from e
+
+    @torch.inference_mode()
+    def get_image_embeddings(self, image: torch.Tensor):
+        """
+        Generate image embeddings for a given image.
+
+        Args:
+            image (torch.Tensor): The input image tensor.
+
+        Returns:
+            torch.Tensor: The image embeddings.
+        """
+        # Note: This is a placeholder. Implement actual image embedding logic if available.
+        raise NotImplementedError(
+            "Image embedding is not yet implemented for this model."
+        )
+
+    @torch.inference_mode()
+    def get_intermediate_embeddings(self, prompt: str, timestep: float) -> torch.Tensor:
+        """
+        Generate intermediate embeddings at a specific timestep.
+
+        Args:
+            prompt (str): The input text prompt.
+            timestep (float): The timestep at which to generate intermediate embeddings.
+
+        Returns:
+            torch.Tensor: The intermediate embeddings.
+
+        Raises:
+            RuntimeError: If there's an issue generating intermediate embeddings.
+        """
+        try:
+            logger.info(
+                f"Generating intermediate embeddings for prompt: {prompt} at timestep: {timestep}"
+            )
+            clip_embeds, t5_embeds, txt_ids = self.get_text_embeddings(prompt)
+
+            height, width = 64, 64  # Example size, adjust as needed
+            img = self.get_noise(
+                1, height, width, device=self.device_flux, dtype=self.dtype
+            )
+
+            img, img_ids, vec, txt, txt_ids = map(
+                lambda x: x.contiguous(),
+                self.prepare(
+                    img=img,
+                    prompt=prompt,
+                    target_device=self.device_flux,
+                    target_dtype=self.dtype,
+                ),
+            )
+
+            t_vec = torch.full(
+                (img.shape[0],), timestep, dtype=self.dtype, device=self.device_flux
+            )
+
+            with torch.no_grad():
+                intermediate_embeds = self.model.forward(
+                    img=img,
+                    img_ids=img_ids,
+                    txt=txt,
+                    txt_ids=txt_ids,
+                    y=vec,
+                    timesteps=t_vec,
+                    guidance=torch.tensor(
+                        [1.0], device=self.device_flux, dtype=self.dtype
+                    ),
+                )
+
+            return intermediate_embeds
+        except Exception as e:
+            logger.error(f"Error in get_intermediate_embeddings: {str(e)}")
+            raise RuntimeError("Failed to generate intermediate embeddings") from e
+
+    @torch.inference_mode()
     def generate(
         self,
         prompt: str,
